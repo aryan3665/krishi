@@ -1,17 +1,20 @@
 import { useState } from "react";
 import { QueryInput } from "./QueryInput";
-import { AdviceCard } from "./AdviceCard";
+import { EnhancedAdviceCard } from "./EnhancedAdviceCard";
+import { OfflineIndicator } from "./OfflineIndicator";
+import { DemoPanel } from "./DemoPanel";
 import { QueryHistory } from "./QueryHistory";
 import { BottomNavigation } from "./BottomNavigation";
 import { LanguageSelector } from "./LanguageSelector";
 import { ThemeToggle } from "./ThemeToggle";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sprout, Leaf, Sun, History as HistoryIcon, HelpCircle, Settings, LogOut, User } from "lucide-react";
+import { Sprout, Leaf, Sun, History as HistoryIcon, HelpCircle, Settings, LogOut, User, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getTranslation, getStringTranslation } from "@/utils/translations";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueries } from "@/hooks/useQueries";
+import { DatasetResponse } from "@/types/datasets";
 interface HistoryItem {
   id: string;
   query: string;
@@ -21,12 +24,13 @@ interface HistoryItem {
   source: string;
 }
 export const KrishiSakhaApp = () => {
-  const [activeTab, setActiveTab] = useState("home");
+  const [activeTab, setActiveTab] = useState("demo"); // Start with demo tab for showcase
   const [language, setLanguage] = useState("en");
   const [currentAdvice, setCurrentAdvice] = useState<{
     advice: string;
     explanation: string;
     source: string;
+    datasetInfo?: DatasetResponse;
   } | null>(null);
   const { user, signOut } = useAuth();
   const { queries, loading, submitQuery, deleteQuery } = useQueries();
@@ -40,7 +44,8 @@ export const KrishiSakhaApp = () => {
         setCurrentAdvice({
           advice: result.advice,
           explanation: result.explanation || "",
-          source: "Krishi Sakha AI"
+          source: "Krishi Sakha AI",
+          datasetInfo: result.datasetInfo
         });
       }
     } catch (error) {
@@ -63,6 +68,10 @@ export const KrishiSakhaApp = () => {
   };
   const renderContent = () => {
     switch (activeTab) {
+      case "demo":
+        return <div className="space-y-4">
+            <DemoPanel onRunScenario={generateAdvice} language={language} />
+          </div>;
       case "home":
         return <div className="space-y-6">
             {/* Welcome section */}
@@ -101,8 +110,20 @@ export const KrishiSakhaApp = () => {
               <QueryInput onSubmit={generateAdvice} language={language} isLoading={loading} />
             </div>
 
+            {/* Offline indicator */}
+            <OfflineIndicator language={language} />
+
             {/* Current advice */}
-            {currentAdvice && <AdviceCard advice={currentAdvice.advice} explanation={currentAdvice.explanation} source={currentAdvice.source} language={language} onTranslate={handleTranslate} />}
+            {currentAdvice && (
+              <EnhancedAdviceCard 
+                advice={currentAdvice.advice} 
+                explanation={currentAdvice.explanation} 
+                source={currentAdvice.source} 
+                language={language} 
+                datasetInfo={currentAdvice.datasetInfo}
+                onTranslate={handleTranslate} 
+              />
+            )}
 
             {/* Recent activity */}
             {queries.length > 0 && <div className="glass-card p-6 rounded-2xl shadow-soft">

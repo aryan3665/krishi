@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { preprocessQuery } from '@/utils/queryPreprocessor';
+import { DatasetOrchestrator, parseLocationFromQuery, parseCropFromQuery, determineQueryType } from '@/services/datasetAgents';
+import { DatasetResponse, QueryContext } from '@/types/datasets';
 
 export interface Query {
   id: string;
@@ -22,13 +24,16 @@ export const useQueries = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const generateAdviceWithAI = async (cleanedText: string, detectedLanguage: string | null, language: string): Promise<{ advice: string; explanation: string }> => {
+  const datasetOrchestrator = new DatasetOrchestrator();
+
+  const generateAdviceWithAI = async (cleanedText: string, detectedLanguage: string | null, language: string, datasetContext?: any): Promise<{ advice: string; explanation: string }> => {
     try {
       const { data, error } = await supabase.functions.invoke('generate-advice', {
         body: {
           cleaned_query_text: cleanedText,
           detected_language: detectedLanguage,
-          language: language
+          language: language,
+          dataset_context: datasetContext
         }
       });
 
@@ -52,6 +57,36 @@ export const useQueries = () => {
         advice: "For best results, consider your local soil conditions, climate, and crop variety. Consult with local agricultural experts for specific guidance.",
         explanation: "Unable to generate AI advice at this time. Please try again later."
       };
+    }
+  };
+
+  const generateEnhancedAdviceWithRAG = async (
+    cleanedText: string, 
+    detectedLanguage: string | null, 
+    language: string
+  ): Promise<{ advice: string; explanation: string; datasetInfo?: DatasetResponse }> => {
+    try {
+      // Parse query context
+      const location = parseLocationFromQuery(cleanedText);
+      const crop = parseCropFromQuery(cleanedText);
+      const queryType = determineQueryType(cleanedText);
+      
+      const context: QueryContext = {
+        location,
+        crop,
+        queryType
+      };
+
+      // Retrieve relevant dataset information
+      const datasetInfo = await datasetOrchestrator.retrieveRelevantData(context);
+      
+      // Generate AI advice with dataset context
+      const aiResponse = await generateAdviceWithAI(cleanedText, detectedLanguage, language, datasetInfo);
+      
+      return { ...aiResponse, datasetInfo };
+    } catch (error) {
+      console.error('Error in RAG pipeline:', error);
+      return await generateAdviceWithAI(cleanedText, detectedLanguage, language);
     }
   };
 
@@ -100,7 +135,7 @@ export const useQueries = () => {
         return;
       }
 
-      const { advice, explanation } = await generateAdviceWithAI(processed.cleanedText, processed.detectedLanguage, language);
+      const { advice, explanation, datasetInfo } = await generateEnhancedAdviceWithRAG(processed.cleanedText, processed.detectedLanguage, language);
       
       const { data, error } = await supabase
         .from('queries')
@@ -125,7 +160,7 @@ export const useQueries = () => {
         description: "Your agricultural query has been processed successfully!",
       });
       
-      return data;
+      return { ...data, datasetInfo };
     } catch (error) {
       console.error('Error submitting query:', error);
       toast({

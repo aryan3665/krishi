@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Home, History, HelpCircle, Settings } from "lucide-react";
+import { Home, History, HelpCircle, Settings, BarChart3 } from "lucide-react";
 import { getStringTranslation } from "@/utils/translations";
 
 interface BottomNavigationProps {
@@ -9,6 +9,7 @@ interface BottomNavigationProps {
 }
 
 const getNavItems = (language: string) => [
+  { id: "demo", label: "Demo", icon: BarChart3 },
   { id: "home", label: getStringTranslation(language, 'home'), icon: Home },
   { id: "history", label: getStringTranslation(language, 'history'), icon: History },
   { id: "help", label: getStringTranslation(language, 'help'), icon: HelpCircle },
